@@ -600,13 +600,21 @@ figcaption {
    =========================== */
 .abl-layout {
   margin-top: 20px;
-  display: flex;
-  justify-content: center;
 }
 
-.abl-center {
-  width: 100%;
-  max-width: 700px;
+.results-table-abl th {
+  text-align: center;
+  white-space: normal;
+  min-width: 0;
+}
+
+.results-table-abl td {
+  text-align: center;
+}
+
+.results-table-abl td:first-child {
+  min-width: 0;
+  white-space: normal;
 }
 
 @media (max-width: 820px) {
