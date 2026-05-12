@@ -727,6 +727,38 @@
   </div>
 </section>
 
+<!-- ======================== BIBTEX ======================== -->
+<section class="section" id="bibtex">
+  <div class="container narrow">
+    <h2 class="section-title">BibTeX</h2>
+    <div class="bibtex-block">
+      <button class="bibtex-copy" onclick="copyBibtex()" title="Copy to clipboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+        Copy
+      </button>
+      <pre class="bibtex-code" id="bibtex-content">@article{learnweak2025,
+  title     = {Learn from Weaknesses: Automated Domain Specialization for Small Computer-Use Agents},
+  author    = {Kim, Suji and Kim, Kangsan and Hwang, Sung Ju},
+  journal   = {arXiv preprint},
+  year      = {2025},
+}</pre>
+    </div>
+  </div>
+</section>
+
+<script>
+function copyBibtex() {
+  const text = document.getElementById('bibtex-content').innerText;
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = document.querySelector('.bibtex-copy');
+    btn.textContent = 'Copied!';
+    setTimeout(() => {
+      btn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg> Copy';
+    }, 2000);
+  });
+}
+</script>
+
 <!-- ======================== FOOTER ======================== -->
 <footer class="footer">
   <div class="container">

@@ -738,3 +738,45 @@ u {
     font-size: 1.6rem;
   }
 }
+
+/* ===========================
+   BibTeX
+   =========================== */
+.bibtex-block {
+  position: relative;
+  background: #1e2030;
+  border-radius: var(--radius);
+  padding: 24px 28px;
+  overflow-x: auto;
+}
+
+.bibtex-code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: #cdd6f4;
+  white-space: pre;
+  margin: 0;
+}
+
+.bibtex-copy {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.1);
+  color: #cdd6f4;
+  border: 1px solid rgba(255,255,255,0.2);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 0.8rem;
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.bibtex-copy:hover {
+  background: rgba(255,255,255,0.2);
+}
