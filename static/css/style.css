@@ -581,10 +581,6 @@ figcaption {
    Ablation Layout
    =========================== */
 .abl-layout {
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 28px;
-  align-items: start;
   margin-top: 20px;
 }
 

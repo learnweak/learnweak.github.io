@@ -336,7 +336,7 @@
         <div class="highlight-label">avg. improvement<br>OpenCUA-7B</div>
       </div>
       <div class="highlight-box">
-        <div class="highlight-num">5 / 8</div>
+        <div class="highlight-num">3 / 8</div>
         <div class="highlight-label">domains where EvoCUA-8B<br>surpasses the 32B teacher</div>
       </div>
     </div>
@@ -344,7 +344,7 @@
     <div class="finding-box">
       <h4>Key Finding: Small students can surpass the teacher</h4>
       <p>
-        The specialized EvoCUA-8B outperforms the 32B teacher on <strong>Gimp, Calc, Impress, Thunderbird,</strong> and <strong>VSCode</strong>.
+        The specialized EvoCUA-8B outperforms the 32B teacher on <strong>Gimp, Thunderbird,</strong> and <strong>VSCode</strong>.
         This suggests that weakness-focused corrective supervision can be more than simple imitation: even when training data is provided by the teacher, the student can use targeted corrections to address its own domain-specific failures and ultimately surpass the teacher.
       </p>
     </div>
@@ -498,12 +498,6 @@
           <span class="legend-item"><span class="legend-dot iteronly-dot"></span> Iterative, no weakness report</span>
           <span class="legend-item"><span class="legend-dot ours-dot"></span> Full pipeline (LearnWeak)</span>
         </div>
-      </div>
-      <div class="abl-fig-block">
-        <figure class="figure-block">
-          <img src="static/images/stats_ablation_evocua8b.png" alt="Data statistics for ablation" class="figure-img" />
-          <figcaption>Generated-data statistics for module ablation on LearnWeak-Gen.</figcaption>
-        </figure>
       </div>
     </div>
 
