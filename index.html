@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LearnWeak: Automated Domain Specialization for Small Computer-Use Agents</title>
+  <link rel="stylesheet" href="static/css/style.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+  <!-- MathJax for LaTeX rendering -->
+  <script>
+    MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js" id="MathJax-script" async></script>
+</head>
+<body>
+
+<!-- ======================== HERO ======================== -->
+<section class="hero">
+  <div class="container">
+    <h1 class="paper-title">
+      Learn from Weaknesses: Automated Domain Specialization<br>for Small Computer-Use Agents
+    </h1>
+
+    <div class="authors">
+      <span class="author">Suji Kim<sup>1,2*</sup></span>
+      <span class="author">Kangsan Kim<sup>1*</sup></span>
+      <span class="author">Sung Ju Hwang<sup>1,3</sup></span>
+    </div>
+    <div class="affiliations">
+      <span><sup>1</sup>KAIST</span>
+      <span><sup>2</sup>Samsung Electronics</span>
+      <span><sup>3</sup>DeepAuto.ai</span>
+    </div>
+    <div class="equal-note"><sup>*</sup>Equal Contribution</div>
+
+    <div class="buttons">
+      <a class="btn btn-primary" href="#">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Paper
+      </a>
+      <a class="btn btn-secondary" href="#">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0 0 24 12c0-6.63-5.37-12-12-12z"/></svg>
+        Code
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== ABSTRACT ======================== -->
+<section class="section" id="abstract">
+  <div class="container narrow">
+    <h2 class="section-title">Abstract</h2>
+    <p class="abstract-text">
+      Computer-use agents (CUAs) have recently made substantial progress, but deploying a separate large expert for each software domain remains expensive.
+      Small open CUAs are more practical specialization targets, but they remain substantially weaker and exhibit uneven domain-specific failures.
+      Our key observation is that <strong>effective specialization depends less on broad domain coverage than on constructing the supervision the current student actually needs</strong>.
+      Building on this observation, we introduce <strong>LearnWeak</strong>, an annotation-free specialization framework for small CUAs that uses a stronger reference agent to identify the student's weaknesses in the target domain, synthesize targeted tasks, and construct supervision automatically.
+      LearnWeak further introduces an error-aware specialization objective that disentangles planning and execution errors, enabling more behaviorally precise updates than broad uniform supervision.
+      On OSWorld, LearnWeak improves <strong>EvoCUA-8B by 11.0%</strong> and <strong>OpenCUA-7B by 11.1%</strong> on average across eight domains.
+      We also validate that our student-aware dataset generation and training approaches outperform existing autonomous trajectory generation and training baselines.
+      These results suggest that effective specialization is driven not by more data, but by constructing the right data for the student's unresolved failures.
+    </p>
+  </div>
+</section>
+
+<!-- ======================== CONCEPT ======================== -->
+<section class="section section-alt" id="overview">
+  <div class="container">
+    <h2 class="section-title">Overview</h2>
+    <figure class="figure-block">
+      <img src="static/images/LearnWeak_concept.png" alt="LearnWeak Concept" class="figure-img" />
+      <figcaption>
+        <strong>Left:</strong> Conceptual illustration of LearnWeak — unlike existing approaches that aim for broad domain coverage, LearnWeak targets the specific weaknesses of the current student.
+        <strong>Right:</strong> Representative performance gains across target software domains after domain specialization with LearnWeak.
+      </figcaption>
+    </figure>
+  </div>
+</section>
+
+<!-- ======================== METHOD ======================== -->
+<section class="section" id="method">
+  <div class="container">
+    <h2 class="section-title">Method</h2>
+    <p class="section-intro">
+      LearnWeak decomposes domain specialization into two coupled stages: <strong>LearnWeak-Gen</strong>, an annotation-free data generation loop driven by student failures, and <strong>LearnWeak-DPO</strong>, an error-aware preference optimization that adaptively targets each failure type.
+    </p>
+
+    <figure class="figure-block">
+      <img src="static/images/LearnWeak_method.png" alt="LearnWeak Method Overview" class="figure-img" />
+      <figcaption>
+        Overview of the LearnWeak framework.
+        LearnWeak-Gen iteratively constructs domain data by comparing teacher and student rollouts, summarizing student weaknesses, and generating new tasks conditioned on weakness reports and representative screenshots.
+        LearnWeak-DPO then converts the resulting teacher-success/student-failure cases into step-wise preference supervision and specializes the student with error-aware preference optimization.
+      </figcaption>
+    </figure>
+
+    <div class="method-grid">
+
+      <div class="method-card">
+        <div class="method-card-header">
+          <span class="method-tag">Stage 1</span>
+          <h3>LearnWeak-Gen: Weakness-Aware Data Generation</h3>
+        </div>
+        <div class="method-steps">
+
+          <div class="method-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h4>Seed Query Setup</h4>
+              <p>For each target domain, a small set of executable environment configurations and seed tasks is initialized, requiring only about an hour of human effort — no trajectory annotation is needed.</p>
+            </div>
+          </div>
+
+          <div class="method-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h4>Weakness Discovery</h4>
+              <p>Both teacher and student agents are rolled out on identical tasks. Tasks where the teacher succeeds but the student fails are collected. A verifier produces structured rationales, which are summarized into a <em>weakness report</em> capturing recurring failure modes such as incorrect operation selection or inaccurate element localization.</p>
+            </div>
+          </div>
+
+          <div class="method-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h4>Screenshot-Guided Query Generation</h4>
+              <p>A task-query generator synthesizes new tasks using two complementary strategies: <em>weakness-focused synthesis</em>, conditioned on the weakness report to target identified deficiencies, and <em>exploration-focused synthesis</em>, which uses screenshots to discover unexplored functionalities. Together they balance targeted repair with domain diversity.</p>
+            </div>
+          </div>
+
+          <div class="method-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <h4>Iterative Refinement</h4>
+              <p>Steps 2–3 are repeated for $N{-}1$ iterations, progressively shifting the generated task distribution toward unresolved student weaknesses. The final dataset $\mathcal{F}^d$ aggregates all teacher-success/student-failure cases across iterations.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <div class="method-card">
+        <div class="method-card-header">
+          <span class="method-tag">Stage 2</span>
+          <h3>LearnWeak-DPO: Error-Aware Preference Optimization</h3>
+        </div>
+        <div class="method-steps">
+
+          <div class="method-step">
+            <div class="step-num">1</div>
+            <div class="step-content">
+              <h4>Teacher-Replay Preference Construction</h4>
+              <p>For each failed task, the teacher trajectory is replayed step by step. At each step the student policy is queried under the teacher's context. Steps where teacher and student produce differing tool executions form preference pairs $(c_t^T, a_t^T, \hat{a}_t^S)$.</p>
+            </div>
+          </div>
+
+          <div class="method-step">
+            <div class="step-num">2</div>
+            <div class="step-content">
+              <h4>Error-Type Classification</h4>
+              <p>Each preference pair is categorized into one of two error types:
+              <br>• <strong>Planning-level error</strong> ($\epsilon_\text{PLAN}$): teacher and student choose different action types (e.g., <code>click</code> vs. <code>type</code>).
+              <br>• <strong>Execution-level error</strong> ($\epsilon_\text{EXEC}$): same action type but different parameters (e.g., wrong coordinates).</p>
+            </div>
+          </div>
+
+          <div class="method-step">
+            <div class="step-num">3</div>
+            <div class="step-content">
+              <h4>Selective Supervision Masking</h4>
+              <p>A binary mask $m$ determines which token positions receive gradient updates. Reasoning traces are <em>always excluded</em> to preserve pretrained reasoning. Action descriptions are supervised only for planning-level errors; tool executions are always supervised. This focuses training on the precise failure site rather than uniformly relearning full responses.</p>
+            </div>
+          </div>
+
+          <div class="method-step">
+            <div class="step-num">4</div>
+            <div class="step-content">
+              <h4>Domain-Scalable LoRA Deployment</h4>
+              <p>Domain-specific knowledge is encoded in lightweight LoRA adapters $\{\Delta_d\}$. The base student $\pi_S$ is shared across all domains, and the domain-specific adapter is activated at deployment time: $\hat{\pi}_S^d = \pi_S \oplus \Delta_d$.</p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div><!-- /method-grid -->
+  </div>
+</section>
+
+<!-- ======================== EXPERIMENTS ======================== -->
+<section class="section section-alt" id="experiments">
+  <div class="container">
+    <h2 class="section-title">Experiments</h2>
+
+    <div class="setup-grid">
+      <div class="setup-card">
+        <h4>Benchmark</h4>
+        <p>OSWorld — covering 8 diverse software domains: <span class="domain-tag">Gimp</span> <span class="domain-tag">Calc</span> <span class="domain-tag">Impress</span> <span class="domain-tag">Writer</span> <span class="domain-tag">OS</span> <span class="domain-tag">Thunderbird</span> <span class="domain-tag">VLC</span> <span class="domain-tag">VSCode</span></p>
+      </div>
+      <div class="setup-card">
+        <h4>Student Models</h4>
+        <p>EvoCUA-8B and OpenCUA-7B as the small CUAs to be specialized.</p>
+      </div>
+      <div class="setup-card">
+        <h4>Teacher Model</h4>
+        <p>EvoCUA-32B as the stronger reference agent used for data construction.</p>
+      </div>
+    </div>
+
+    <h3 class="subsection-title">Domain Specialization Results on OSWorld</h3>
+    <p class="table-caption">
+      LearnWeak yields consistent improvements across all eight domains for both student models.
+      Yellow row: teacher policy (EvoCUA-32B). Blue rows: LearnWeak-specialized students.
+      Results reported as mean success rate (%) over three trials.
+    </p>
+
+    <div class="table-wrapper">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Model</th>
+            <th>Gimp</th>
+            <th>Calc</th>
+            <th>Impress</th>
+            <th>Writer</th>
+            <th>OS</th>
+            <th>Thunderbird</th>
+            <th>VLC</th>
+            <th>VSCode</th>
+            <th class="avg-col">Avg.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="section-header-row"><td colspan="10"><em>Generalized Models</em></td></tr>
+          <tr>
+            <td>Kimi K2.6</td>
+            <td>73.08</td><td>80.85</td><td>82.19</td><td>73.91</td>
+            <td>79.17</td><td>80.00</td><td>75.71</td><td>91.30</td>
+            <td class="avg-col">79.53</td>
+          </tr>
+          <tr>
+            <td>Claude Sonnet 4.6</td>
+            <td>69.23</td><td>74.47</td><td>70.21</td><td>86.83</td>
+            <td>91.67</td><td>66.67</td><td>81.41</td><td>72.73</td>
+            <td class="avg-col">76.65</td>
+          </tr>
+          <tr>
+            <td>Qwen3.5-27B</td>
+            <td>39.74</td><td>22.70</td><td>43.97</td><td>52.17</td>
+            <td>41.67</td><td>66.67</td><td>44.12</td><td>47.83</td>
+            <td class="avg-col">44.86</td>
+          </tr>
+
+          <tr class="section-header-row"><td colspan="10"><em>Domain Specialized CUA Models</em></td></tr>
+          <tr>
+            <td>SEAgent</td>
+            <td>42.30</td><td>—</td><td>22.70</td><td>31.80</td>
+            <td>—</td><td>—</td><td>35.30</td><td>40.50</td>
+            <td class="avg-col">—</td>
+          </tr>
+          <tr>
+            <td>OSExpert</td>
+            <td>30.80</td><td>44.70</td><td>42.60</td><td>34.70</td>
+            <td>—</td><td>—</td><td>—</td><td>—</td>
+            <td class="avg-col">—</td>
+          </tr>
+
+          <tr class="section-header-row"><td colspan="10"><em>CUA Models</em></td></tr>
+          <tr class="teacher-row">
+            <td>EvoCUA-32B <span class="badge-teacher">Teacher</span></td>
+            <td>76.29</td><td>51.06</td><td>52.98</td><td>65.22</td>
+            <td>75.00</td><td>60.00</td><td>64.65</td><td>65.22</td>
+            <td class="avg-col">63.80</td>
+          </tr>
+          <tr>
+            <td>OpenCUA-32B</td>
+            <td>74.36</td><td>35.46</td><td>48.21</td><td>56.52</td>
+            <td>61.11</td><td>57.78</td><td>37.25</td><td>72.73</td>
+            <td class="avg-col">55.43</td>
+          </tr>
+          <tr class="divider-row"><td colspan="10"></td></tr>
+          <tr>
+            <td>EvoCUA-8B</td>
+            <td>66.15</td><td>28.07</td><td>37.66</td><td>50.43</td>
+            <td>60.83</td><td>65.33</td><td>45.71</td><td>51.30</td>
+            <td class="avg-col">50.69</td>
+          </tr>
+          <tr class="ours-row">
+            <td>EvoCUA-8B <strong>+ LearnWeak</strong></td>
+            <td>82.05</td><td>41.13</td><td>50.35</td><td>55.07</td>
+            <td>66.67</td><td>73.33</td><td>58.86</td><td>72.46</td>
+            <td class="avg-col"><strong>62.49</strong></td>
+          </tr>
+          <tr class="delta-row">
+            <td>Δ</td>
+            <td>+15.9</td><td>+13.1</td><td>+12.7</td><td>+4.6</td>
+            <td>+5.8</td><td>+8.0</td><td>+11.2</td><td>+21.2</td>
+            <td class="avg-col"><strong>+11.0</strong></td>
+          </tr>
+          <tr class="divider-row"><td colspan="10"></td></tr>
+          <tr>
+            <td>OpenCUA-7B</td>
+            <td>48.46</td><td>11.91</td><td>31.49</td><td>30.43</td>
+            <td>40.00</td><td>54.67</td><td>32.94</td><td>51.30</td>
+            <td class="avg-col">37.65</td>
+          </tr>
+          <tr class="ours-row">
+            <td>OpenCUA-7B <strong>+ LearnWeak</strong></td>
+            <td>57.69</td><td>19.15</td><td>36.88</td><td>40.58</td>
+            <td>59.42</td><td>66.67</td><td>47.06</td><td>62.32</td>
+            <td class="avg-col"><strong>48.72</strong></td>
+          </tr>
+          <tr class="delta-row">
+            <td>Δ</td>
+            <td>+9.2</td><td>+7.2</td><td>+5.4</td><td>+10.2</td>
+            <td>+19.4</td><td>+12.0</td><td>+14.1</td><td>+11.0</td>
+            <td class="avg-col"><strong>+11.1</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="highlight-boxes">
+      <div class="highlight-box">
+        <div class="highlight-num">+11.0%</div>
+        <div class="highlight-label">avg. improvement<br>EvoCUA-8B</div>
+      </div>
+      <div class="highlight-box">
+        <div class="highlight-num">+11.1%</div>
+        <div class="highlight-label">avg. improvement<br>OpenCUA-7B</div>
+      </div>
+      <div class="highlight-box">
+        <div class="highlight-num">5 / 8</div>
+        <div class="highlight-label">domains where EvoCUA-8B<br>surpasses the 32B teacher</div>
+      </div>
+    </div>
+
+    <div class="finding-box">
+      <h4>Key Finding: Small students can surpass the teacher</h4>
+      <p>
+        The specialized EvoCUA-8B outperforms the 32B teacher on <strong>Gimp, Calc, Impress, Thunderbird,</strong> and <strong>VSCode</strong>.
+        This suggests that weakness-focused corrective supervision can be more than simple imitation: even when training data is provided by the teacher, the student can use targeted corrections to address its own domain-specific failures and ultimately surpass the teacher.
+      </p>
+    </div>
+
+    <h3 class="subsection-title">Data Generation Statistics</h3>
+    <div class="stats-grid">
+      <figure class="figure-block">
+        <img src="static/images/stats_student_evocua8b_teacher_evocua32b.png" alt="Data statistics for EvoCUA-8B" class="figure-img" />
+        <figcaption>Generated data statistics for EvoCUA-8B student with EvoCUA-32B teacher across domains.</figcaption>
+      </figure>
+      <figure class="figure-block">
+        <img src="static/images/stats_student_opencua7b_teacher_evocua32b.png" alt="Data statistics for OpenCUA-7B" class="figure-img" />
+        <figcaption>Generated data statistics for OpenCUA-7B student with EvoCUA-32B teacher across domains.</figcaption>
+      </figure>
+    </div>
+
+    <h3 class="subsection-title">Data Construction Comparison</h3>
+    <p class="table-caption">
+      Comparison of LearnWeak-Gen against existing datasets and alternative autonomous generation pipelines under a matched training budget (EvoCUA-8B student).
+      All results are mean success rate (%) on four OSWorld domains.
+    </p>
+
+    <div class="table-wrapper table-wrapper-narrow">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Calc</th>
+            <th>Impress</th>
+            <th>VLC</th>
+            <th>VSCode</th>
+            <th class="avg-col">Avg.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Zero-shot</td>
+            <td>28.07</td><td>37.66</td><td>45.71</td><td>51.30</td>
+            <td class="avg-col">40.69</td>
+          </tr>
+          <tr class="section-header-row"><td colspan="6"><em>Existing Data</em></td></tr>
+          <tr>
+            <td>AgentNet</td>
+            <td>34.04</td><td>39.01</td><td>49.01</td><td>69.57</td>
+            <td class="avg-col">47.91</td>
+          </tr>
+          <tr>
+            <td>AgentNet (N.)</td>
+            <td>32.62</td><td><u>40.43</u></td><td>49.02</td><td>63.77</td>
+            <td class="avg-col">46.46</td>
+          </tr>
+          <tr class="section-header-row"><td colspan="6"><em>Minimal Human Annotation</em></td></tr>
+          <tr>
+            <td>Trajectory Boosting</td>
+            <td>30.50</td><td>19.88</td><td>45.10</td><td>49.28</td>
+            <td class="avg-col">36.19</td>
+          </tr>
+          <tr class="section-header-row"><td colspan="6"><em>Zero Human Annotation</em></td></tr>
+          <tr>
+            <td>AgentSynth</td>
+            <td>31.21</td><td>39.01</td><td>39.22</td><td>71.01</td>
+            <td class="avg-col">45.11</td>
+          </tr>
+          <tr>
+            <td>OS-Genesis</td>
+            <td>31.91</td><td>37.59</td><td>45.10</td><td>68.12</td>
+            <td class="avg-col">45.68</td>
+          </tr>
+          <tr>
+            <td>ZeroGUI</td>
+            <td><u>36.17</u></td><td><u>40.43</u></td><td>48.86</td><td>62.30</td>
+            <td class="avg-col">46.94</td>
+          </tr>
+          <tr>
+            <td>WebSTAR</td>
+            <td>31.21</td><td><u>40.43</u></td><td><u>52.94</u></td><td><strong>73.91</strong></td>
+            <td class="avg-col"><u>49.62</u></td>
+          </tr>
+          <tr class="ours-row">
+            <td><strong>LearnWeak (Ours)</strong></td>
+            <td><strong>41.13</strong></td><td><strong>50.35</strong></td><td><strong>56.86</strong></td><td><u>72.46</u></td>
+            <td class="avg-col"><strong>55.20</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">
+      LearnWeak outperforms all baselines on average, achieving a <strong>5.6% gain over WebSTAR</strong>, the strongest prior baseline.
+      Simply reusing existing data (AgentNet) or scaling diverse generation (AgentSynth, OS-Genesis) yields limited gains; weakness-focused generation is the critical factor.
+    </p>
+
+  </div>
+</section>
+
+<!-- ======================== ANALYSIS ======================== -->
+<section class="section" id="analysis">
+  <div class="container">
+    <h2 class="section-title">Analysis</h2>
+
+    <!-- Data Generation Ablation -->
+    <h3 class="subsection-title">Data Generation Pipeline Ablation</h3>
+    <p class="section-intro">
+      We ablate the key design choices of LearnWeak-Gen: iterative generation and weakness-report conditioning.
+    </p>
+
+    <div class="abl-layout">
+      <div class="abl-table-block">
+        <p class="table-caption">
+          Ablation of data-generation pipeline components. Mean success rate (%) on four OSWorld domains.
+        </p>
+        <div class="table-wrapper">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th>Domain Spec.</th>
+                <th>Iter. Gen.</th>
+                <th>Weak. Report</th>
+                <th>Calc</th>
+                <th>Impress</th>
+                <th>VLC</th>
+                <th>VSCode</th>
+                <th class="avg-col">Avg.</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>✗</td><td>✗</td><td>✗</td>
+                <td>28.07</td><td>37.66</td><td>45.71</td><td>51.30</td>
+                <td class="avg-col">40.69</td>
+              </tr>
+              <tr class="abl-oneshot">
+                <td>✓</td><td>✗</td><td>✗</td>
+                <td><u>34.57</u></td><td>39.72</td><td><u>47.06</u></td><td><strong>73.91</strong></td>
+                <td class="avg-col"><u>48.82</u></td>
+              </tr>
+              <tr class="abl-iteronly">
+                <td>✓</td><td>✓</td><td>✗</td>
+                <td>24.82</td><td><u>42.55</u></td><td>43.14</td><td><u>72.46</u></td>
+                <td class="avg-col">45.74</td>
+              </tr>
+              <tr class="ours-row">
+                <td>✓</td><td>✓</td><td>✓</td>
+                <td><strong>41.13</strong></td><td><strong>50.35</strong></td><td><strong>56.86</strong></td><td><u>72.46</u></td>
+                <td class="avg-col"><strong>55.20</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="legend">
+          <span class="legend-item"><span class="legend-dot oneshot-dot"></span> One-shot (no iteration, no weakness report)</span>
+          <span class="legend-item"><span class="legend-dot iteronly-dot"></span> Iterative, no weakness report</span>
+          <span class="legend-item"><span class="legend-dot ours-dot"></span> Full pipeline (LearnWeak)</span>
+        </div>
+      </div>
+      <div class="abl-fig-block">
+        <figure class="figure-block">
+          <img src="static/images/stats_ablation_evocua8b.png" alt="Data statistics for ablation" class="figure-img" />
+          <figcaption>Generated-data statistics for module ablation on LearnWeak-Gen.</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <div class="finding-box">
+      <h4>Key Insight: Iteration alone is insufficient — weakness-aware guidance is essential</h4>
+      <p>
+        One-shot domain specialization (no iteration) already provides a useful baseline (40.69 → 48.82 avg.).
+        However, adding iteration <em>without</em> the weakness report actually hurts performance (45.74 avg.), showing that exploration-only generation fails to collect effectively targeted training samples.
+        The full pipeline combining iteration with weakness-report conditioning achieves the best result (55.20 avg.), demonstrating that the benefit of iterative expansion depends on student-aware guidance.
+      </p>
+    </div>
+
+    <!-- Teacher Choice -->
+    <h3 class="subsection-title">Effect of Teacher Choice</h3>
+    <div class="two-col-layout">
+      <div>
+        <p class="table-caption">
+          Effect of teacher policy choice ($\pi_T$). Both teacher standalone performance and resulting specialized student performance are reported.
+        </p>
+        <div class="table-wrapper">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th rowspan="2">Teacher Policy</th>
+                <th colspan="2">Teacher</th>
+                <th colspan="2">Specialized Student</th>
+              </tr>
+              <tr>
+                <th>Calc</th><th>VSCode</th>
+                <th>Calc</th><th>VSCode</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Zero-shot</td>
+                <td>—</td><td>—</td>
+                <td>28.07</td><td>51.30</td>
+              </tr>
+              <tr>
+                <td>Claude Haiku 4.6</td>
+                <td>36.17</td><td>69.60</td>
+                <td>30.50</td><td>71.01</td>
+              </tr>
+              <tr>
+                <td>EvoCUA-32B</td>
+                <td>51.06</td><td>65.22</td>
+                <td><strong>41.13</strong></td><td>72.46</td>
+              </tr>
+              <tr>
+                <td>Kimi K2.5</td>
+                <td><strong>63.83</strong></td><td><strong>86.96</strong></td>
+                <td><strong>41.13</strong></td><td><strong>73.91</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="table-note">
+          Teacher capability matters mainly because it enables reliable successful trajectories. Once the teacher is strong enough, further improvements depend less on teacher performance and more on whether its supervision addresses the student's specific weaknesses.
+        </p>
+      </div>
+
+      <div>
+        <figure class="figure-block">
+          <img src="static/images/stats_teachers_evocua8b_by_domain.png" alt="Teacher stats by domain" class="figure-img" />
+          <figcaption>Teacher performance across domains used in specialization of EvoCUA-8B.</figcaption>
+        </figure>
+      </div>
+    </div>
+
+    <!-- Student-Awareness Ablation -->
+    <h3 class="subsection-title">Student-Awareness of Dataset Generation</h3>
+    <p class="section-intro">
+      To verify that LearnWeak-Gen is truly student-aware, we train each target model on datasets constructed from weakness reports derived from <em>different</em> source students.
+      If the generation pipeline genuinely captures model-specific failures, a model trained on its own weakness-conditioned dataset should outperform one trained on a cross-student dataset.
+    </p>
+    <div class="table-wrapper table-wrapper-narrow">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Target Model $\pi_\theta$ / Source Student $\pi_S$</th>
+            <th>Calc</th>
+            <th>Impress</th>
+            <th>VLC</th>
+            <th>VSCode</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="section-header-row"><td colspan="5"><em>OpenCUA-7B (target)</em></td></tr>
+          <tr>
+            <td>Zero-shot</td>
+            <td>11.91</td><td>31.49</td><td>32.94</td><td>51.30</td>
+          </tr>
+          <tr>
+            <td>Source: EvoCUA-8B</td>
+            <td>9.93</td><td>27.54</td><td>45.10</td><td>50.72</td>
+          </tr>
+          <tr>
+            <td>Source: UI-TARS-1.5-7B</td>
+            <td>7.80</td><td>33.35</td><td>—</td><td>49.28</td>
+          </tr>
+          <tr class="ours-row">
+            <td>Source: OpenCUA-7B <span class="badge-ours">(own)</span></td>
+            <td><strong>19.15</strong></td><td><strong>36.88</strong></td><td><strong>47.06</strong></td><td><strong>62.32</strong></td>
+          </tr>
+          <tr class="section-header-row"><td colspan="5"><em>EvoCUA-8B (target)</em></td></tr>
+          <tr>
+            <td>Zero-shot</td>
+            <td>28.07</td><td>37.66</td><td>45.71</td><td>51.30</td>
+          </tr>
+          <tr>
+            <td>Source: UI-TARS-1.5-7B</td>
+            <td>22.70</td><td>31.21</td><td>—</td><td>71.01</td>
+          </tr>
+          <tr>
+            <td>Source: OpenCUA-7B</td>
+            <td>39.01</td><td>43.26</td><td>47.06</td><td><strong>73.91</strong></td>
+          </tr>
+          <tr class="ours-row">
+            <td>Source: EvoCUA-8B <span class="badge-ours">(own)</span></td>
+            <td><strong>41.13</strong></td><td><strong>50.35</strong></td><td><strong>56.86</strong></td><td>72.46</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">
+      Both models achieve the highest performance when trained on datasets generated from their <em>own</em> failure cases, while cross-student datasets yield consistently lower gains.
+      This confirms that LearnWeak-Gen captures model-specific deficiencies rather than generic task distributions.
+    </p>
+
+    <!-- Training Objective Ablation -->
+    <h3 class="subsection-title">Training Objective Ablation</h3>
+    <p class="section-intro">
+      We compare LearnWeak-DPO with standard SFT, DPO, and variants with different error-aware supervision masks, all trained on the same dataset from LearnWeak-Gen.
+    </p>
+    <div class="table-wrapper table-wrapper-narrow">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>Method</th>
+            <th>Calc</th>
+            <th>Impress</th>
+            <th>VLC</th>
+            <th>VSCode</th>
+            <th class="avg-col">Avg.</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Zero-shot</td>
+            <td>28.07</td><td>37.66</td><td>45.71</td><td>51.30</td>
+            <td class="avg-col">40.69</td>
+          </tr>
+          <tr class="section-header-row"><td colspan="6"><em>SFT</em></td></tr>
+          <tr>
+            <td>Standard SFT ($m = \varnothing$)</td>
+            <td>29.08</td><td>39.72</td><td>45.10</td><td>68.12</td>
+            <td class="avg-col">45.51</td>
+          </tr>
+          <tr>
+            <td>LearnWeak-SFT</td>
+            <td><u>34.04</u></td><td><u>46.81</u></td><td>45.10</td><td><u>69.57</u></td>
+            <td class="avg-col"><u>48.88</u></td>
+          </tr>
+          <tr class="section-header-row"><td colspan="6"><em>DPO</em></td></tr>
+          <tr>
+            <td>Standard DPO ($m = \varnothing$)</td>
+            <td>27.66</td><td>40.43</td><td><u>49.02</u></td><td>65.22</td>
+            <td class="avg-col">45.58</td>
+          </tr>
+          <tr>
+            <td>DPO, planning-only mask</td>
+            <td>18.44</td><td>17.02</td><td>41.18</td><td>63.77</td>
+            <td class="avg-col">35.10</td>
+          </tr>
+          <tr>
+            <td>DPO, execution-only mask</td>
+            <td>24.82</td><td>39.72</td><td>45.10</td><td>71.01</td>
+            <td class="avg-col">45.16</td>
+          </tr>
+          <tr class="ours-row">
+            <td><strong>LearnWeak-DPO (Ours)</strong></td>
+            <td><strong>41.13</strong></td><td><strong>50.35</strong></td><td><strong>56.86</strong></td><td><strong>72.46</strong></td>
+            <td class="avg-col"><strong>55.20</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="table-note">
+      Full-response optimization (standard SFT/DPO) improves only modestly. Error-aware masking consistently improves SFT, and LearnWeak-DPO outperforms standard DPO by <strong>9.62 points on average</strong>.
+      Using only planning-level or only execution-level supervision is insufficient — effective specialization requires both.
+    </p>
+
+    <!-- Iteration Effect -->
+    <h3 class="subsection-title">Effect of Generation Rounds</h3>
+    <figure class="figure-block figure-medium">
+      <img src="static/images/abl_iteration.png" alt="Effect of number of generation rounds" class="figure-img" />
+      <figcaption>
+        Effect of the number of generation rounds $N$ on specialization performance and accumulated data volume in Calc and VSCode.
+        Performance improves over early iterations, reaches a maximum at an intermediate stage, and then decreases as additional rounds are added.
+        This non-monotonic trend suggests that the marginal value of additional rounds depends on whether the newly generated tasks remain well-aligned with the student's unresolved weaknesses.
+      </figcaption>
+    </figure>
+
+  </div>
+</section>
+
+<!-- ======================== CONCLUSION ======================== -->
+<section class="section section-alt" id="conclusion">
+  <div class="container narrow">
+    <h2 class="section-title">Conclusion</h2>
+    <p>
+      We study domain specialization for small computer-use agents in a fully automated setting.
+      The central idea of LearnWeak is that, for specialization, the most useful supervision is not broad domain coverage but the subset of tasks that exposes the current student's actual weaknesses.
+    </p>
+    <p>
+      Based on this view, we propose a two-stage framework: <strong>LearnWeak-Gen</strong>, which iteratively constructs a weakness-aware domain dataset through teacher-student comparison and screenshot-grounded query synthesis, and <strong>LearnWeak-DPO</strong>, which converts the resulting teacher-success/student-failure cases into step-level preference supervision with error-aware masking.
+    </p>
+    <p>
+      Results show that this targeted specialization strategy substantially improves small CUAs across diverse software domains and outperforms alternative data-construction approaches.
+      The gains support our claim that efficient specialization depends on identifying and repairing student-specific weaknesses rather than simply scaling synthetic data.
+      Our results further suggest that automated domain specialization can narrow the gap between small open CUAs and much larger agents without requiring human trajectory annotation, making small specialized agents a more practical deployment path for real-world software environments.
+    </p>
+  </div>
+</section>
+
+<!-- ======================== FOOTER ======================== -->
+<footer class="footer">
+  <div class="container">
+    <p>
+      LearnWeak — Automated Domain Specialization for Small Computer-Use Agents.
+      KAIST &amp; Samsung Electronics.
+    </p>
+    <p class="footer-contact">
+      Contact: <a href="mailto:kangsan.kim@kaist.ac.kr">kangsan.kim@kaist.ac.kr</a>
+    </p>
+  </div>
+</footer>
+
+</body>
+</html>
